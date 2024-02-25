@@ -1,0 +1,26 @@
+%dw 2.0
+
+type auto_b7a50de1_5eff_444c_a95a_6e27b810f639_Input_Variables_currRecord = {|
+  payload: java_lang_Object, 
+  attributes: org_mule_extension_file_api_LocalFileAttributes
+|} {"typeId": "org.mule.runtime.api.message.Message"}
+type org_mule_extension_file_api_LocalFileAttributes = {|
+  lastModifiedTime: DateTime {"typeId": "java.time.LocalDateTime"}, 
+  lastAccessTime: DateTime {"typeId": "java.time.LocalDateTime"}, 
+  creationTime: DateTime {"typeId": "java.time.LocalDateTime"}, 
+  size: Number, 
+  regularFile?: Boolean {"typeId": "boolean"}, 
+  directory?: Boolean {"typeId": "boolean"}, 
+  symbolicLink?: Boolean {"typeId": "boolean"}, 
+  path: String, 
+  fileName: String
+|} {"typeAlias": "LocalFileAttributes",
+"typeId": "org.mule.extension.file.api.LocalFileAttributes"}
+
+
+type java_lang_Object = {|  |} {"typeAlias": "Object",
+"class": "java.lang.Object",
+"typeId": "java.lang.Object"}
+
+
+

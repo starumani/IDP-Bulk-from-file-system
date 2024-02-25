@@ -1,0 +1,10 @@
+%dw 2.0
+
+type auto_008f40db_8ca1_415a_afad_d313091253cb_Output_Variables_configuration = {|
+  "type": String, 
+  queries: Array<Nothing>, 
+  features: Array<String>, 
+  analyzers: Array<Nothing>, 
+  confidenceScore: Number
+|}
+

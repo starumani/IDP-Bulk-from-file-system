@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_b7a50de1_5eff_444c_a95a_6e27b810f639_Input_Variables_filePath = String
+

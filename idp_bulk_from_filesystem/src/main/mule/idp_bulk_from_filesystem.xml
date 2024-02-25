@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:slack="http://www.mulesoft.org/schema/mule/slack" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/slack http://www.mulesoft.org/schema/mule/slack/current/mule-slack.xsd">
+	<flow name="rest_Trigger" doc:id="1bdce4b6-478c-483e-a1e5-79a5ecdfca1c" >
+		<http:listener doc:name="Listener" doc:id="1d66a963-0b30-4dcf-9e10-141b4a524efe" config-ref="REST_Trigger_HTTP_Listener_config" path="/startFilesProcessing"/>
+		<set-variable value="TEMP2" doc:name="directoryName" doc:id="eaf1ff94-06f0-4934-9c30-e8cba737d5c8" variableName="directoryName"/>
+		<file:list doc:id="72174b7b-f528-446d-bc12-d73577691643" config-ref="File_Config" directoryPath="#[vars.directoryName]" doc:name="List" >
+			<file:matcher filenamePattern="*.{pdf,PDF}" directories="EXCLUDE" symLinks="EXCLUDE"/>
+		</file:list>
+		<ee:transform doc:name="Transform Message" doc:id="c5d093ef-714b-445e-8968-cb29cbd58c22" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<batch:job jobName="idp_bulk_from_filesystemBatch_Job" doc:id="762231f9-b995-40d5-9141-d993bba9270e" blockSize="6" maxConcurrency="20" maxFailedRecords="-1">
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="3a12009c-6b6a-4918-a099-f6447926d81f">
+					<flow-ref doc:name="Read File" doc:id="4f123828-e3fc-4c06-bfd0-65f22eb4df81" name="read_File"/>
+					<flow-ref doc:name="Authenticate Anypoint User" doc:id="df2a360a-b494-4cce-8086-2c4480a7aba9" name="authenticate_Anypoint_User"/>
+					<flow-ref doc:name="Call IDP Service - Execution" doc:id="ae27b6b8-19fd-4664-9f73-9d68dd6af48a" name="call_IDP_Service"/>
+					<flow-ref doc:name="Get Results from IDP Service - Polling" doc:id="2bd84a39-7023-4418-9072-42af8df644f9" name="get_Results_From_IDP_Service"/>
+				</batch:step>
+				<batch:step name="Batch_Step1" doc:id="d3eb2736-a1e6-4cae-ad71-ebb3d4dc4ba6" acceptPolicy="ONLY_FAILURES">
+					<logger level="INFO" doc:name="Logger" doc:id="9c899bc9-4aaa-4eb5-9a28-667b64ed487c" message='#["============================ERROR OCCURED WHILE PROCESSING THE FILE============================"]'/>
+					<logger level="INFO" doc:name="Logger" doc:id="c947eec1-5605-41dc-9390-e30efdf89165" message="#[Batch::getStepExceptions()]"/>
+					<file:move doc:name="Move" doc:id="21fa12e3-0ea2-4a88-bfc9-3623321a53c6" config-ref="File_Config" sourcePath='#[vars.filePath]' targetPath='#[vars.directoryName ++ "/Failed"]' renameTo='#[vars.filePath ++ "_____" ++ vars.executionId default ""]'/>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete >
+				<logger level="INFO" doc:name="Logger" doc:id="55c6ec43-b28b-4413-8fce-ab51b16b3944" message="Processing Complete"/>
+			</batch:on-complete>
+		</batch:job>
+		<ee:transform doc:name="Transform Message" doc:id="450bee77-5527-467b-87b5-8ac92e9b49b1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"SUCCESSFULLY STARTED PROCESSING. \n\nPlease refer to the file system directory for results"]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<sub-flow name="read_File" doc:id="b7a50de1-5eff-444c-a95a-6e27b810f639">
+		<set-variable value="#[payload.attributes.name]" doc:name="fileName" doc:id="8fa10ea3-0c61-41c5-81fa-62918a961cc1" variableName="fileName" />
+		<set-variable value="#[payload.attributes.path]" doc:name="filePath" doc:id="64aec8b2-b31b-49af-bc44-c3f2f0004745" variableName="filePath" />
+		<file:read doc:name="Read" doc:id="7b1fb82e-b12b-4444-852b-bcdf0538ce50" path="#[vars.filePath]" />
+		<set-variable value="#[%dw 2.0&#10;import * from dw::core::Binaries&#10;import * from dw::core::Strings&#10;&#10;output application/octet-stream&#10;--- &#10;payload]" doc:name="fileData" doc:id="c8c89e80-5f9a-4fcc-b61e-19a1b9cc1aaa" variableName="fileData" />
+	</sub-flow>
+	<sub-flow name="authenticate_Anypoint_User" doc:id="511d1446-6795-45a9-affa-ec633b520543" >
+		<http:request method="${http.post_method}" doc:name="Authenticate" doc:id="97db07d2-72ee-4805-8696-7d0e00989565" path="${anypoint_http_request.auth_path}" config-ref="Anypoint_HTTP_Request_configuration">
+			<http:body ><![CDATA[#[%dw 2.0
+output application/x-www-form-urlencoded
+---
+{
+	"grant_type":p('anypoint_http_request.auth_grant_type'),
+	"client_id":p('anypoint_http_request.auth_client_id'),
+	"client_secret":p('anypoint_http_request.auth_client_secret')
+}]]]></http:body>
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Content-Type" : "application/x-www-form-urlencoded"
+}]]]></http:headers>
+		</http:request>
+		<set-variable value="#[payload.access_token]" doc:name="Bearer Token" doc:id="aead9a98-d99c-408d-bab1-cc47e50b7d92" variableName="token" />
+		<logger level="INFO" doc:name="Logger" doc:id="8782e9ae-d92e-46f1-bff6-94ea7adfbdaf" message='#["============================ BEARER TOKEN:     " ++ vars.token ++ "      ============================"]' />
+	</sub-flow>
+	<sub-flow name="call_IDP_Service" doc:id="008f40db-8ca1-415a-afad-d313091253cb" >
+		<set-variable value='#[%dw 2.0&#10;output application/json&#10;---&#10;{"type":"PURCHASE_ORDER","queries":[{"query":"What is the Buyer Code?","name":"dept_code"},{"query":"What is the part number?","name":"part_number"},{"query":"What is the requested delivery date?","name":"req_delivery_date"},{"query":"What is the requested ship date?","name":"req_ship_date"}],"features":["QUERIES"],"analyzers":[{"query":"Task: Extract the requested delivery date from the text. Skip any preamble text and just give the delivery date mentioned in the document.","name":"req_delivery_date"},{"query":"Task: Extract the requested ship date from the text. Skip any preamble text and just give the shipping date mentioned in the document.","name":"req_ship_date"}],"confidenceScore":80}]' doc:name="configuration" doc:id="12ecc866-b2d7-457d-bf59-d139e61ad6d8" variableName="configuration" />
+		<ee:transform doc:name="Transform Message" doc:id="4c0ffd70-8cdb-47e1-9b5b-6c1b7de7d7b6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+import dw::module::Multipart
+import * from dw::core::Binaries
+output multipart/form-data boundary="--------------------------abc123"
+---
+{
+	parts : {
+		file : {
+			headers : {
+				"Content-Disposition" : {
+					"name": "file",
+					"filename": vars.fileName,
+					"subtype": "form-data"
+					},
+				"Content-Type" : "application/pdf"
+				},
+			content : vars.fileData
+			},
+		configuration: {
+			headers : {
+				"Content-Disposition" : {
+					"name": "configuration",
+					"subtype": "form-data"
+					},
+				"Content-Type" : "application/json"
+				},
+			content : vars.configuration
+		}
+		}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="${http.post_method}" doc:name="Call IDP Service" doc:id="b052d228-1f54-4c3a-9aa9-99cba3e2f004" config-ref="IDP_HTTP_Request_configuration" path="${idp_http_request.executions_path}" >
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.token
+}]]]></http:headers>
+		</http:request>
+		<set-variable value="#[payload.id as String]" doc:name="executionId" doc:id="7e03810a-51d4-448d-9129-dcd333dd2a1c" variableName="executionId" />
+		<logger level="INFO" doc:name="Logger" doc:id="04156095-dbca-40de-aa02-e6219d433185" message='#["============================ EXECUTION ID:     " ++ vars.executionId ++ "      ============================"]' />
+	</sub-flow>
+	<sub-flow name="get_Results_From_IDP_Service" doc:id="c55100c0-116f-4ebc-903e-afad77a7c87b" >
+		<until-successful maxRetries="50" doc:name="Until Successful" doc:id="a20afcff-43b0-4322-ae69-323889a8e0b0" millisBetweenRetries="6000">
+			<http:request method="${http.get_method}" doc:name="Get Results from IDP Service" doc:id="dc42d8d8-c101-4a01-86bd-82c816b4b0aa" config-ref="IDP_HTTP_Request_configuration" path="${idp_http_request.executions_by_id_path}" sendBodyMode="NEVER" >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.token
+}]]]></http:headers>
+				<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"executionId" : payload.id
+}]]]></http:uri-params>
+			</http:request>
+			<choice doc:name="Choice" doc:id="72c7ee08-5241-47b5-8f6d-24180246c5d0">
+				<when expression="#['SUCCEEDED' != payload.status and 'FAILED' != payload.status]">
+					<choice doc:name="Choice" doc:id="a39ef060-f100-4635-a223-d2dd8cf19f46">
+						<when expression="#['MANUAL_VALIDATION_REQUIRED' == payload.status]">
+							<logger level="INFO" doc:name="Logger" doc:id="5ab9445e-6052-40d8-bfbe-75c4edf233d9" message="Manual Validation Needed" />
+							<file:move doc:name="Move" doc:id="3cd83458-b297-4246-9298-53d4c97c8cb3" config-ref="File_Config" sourcePath="#[vars.filePath]" targetPath='#[vars.directoryName ++ "/Manual Validation Required"]'/>
+							<flow-ref doc:name="Process results to CSV" doc:id="02437a8a-a0cb-4391-97d6-de10f3af29a3" name="process_Results_To_CSV" />
+						</when>
+						<otherwise >
+							<raise-error doc:name="Raise error" doc:id="f7798783-8a9d-4df9-bbf7-6181bae388ad" type="MULE:CONNECTIVITY" description="Service not done yet" />
+						</otherwise>
+					</choice>
+				</when>
+				<when expression="#['FAILED' == payload.status]">
+					<logger level="INFO" doc:name="Logger" doc:id="089aeb4f-afa8-4c42-86fe-bee431f208b1" />
+					<file:move doc:name="Move" doc:id="3a10bc8c-5c6f-4e69-8101-1d94cd52649c" config-ref="File_Config" sourcePath="#[vars.filePath]" targetPath='#[vars.directoryName ++ "/Failed"]' />
+				</when>
+				<otherwise>
+					<logger level="INFO" doc:name="Logger" doc:id="7ea2e386-e189-4383-ae22-4812cbca1529" message="#[payload]" />
+					<ee:transform doc:name="Transform Message" doc:id="d833e5ae-40b0-4991-a129-7829ce9987fa" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<flow-ref doc:name="Process results to CSV" doc:id="34087ccc-62ce-4b80-8a16-a593b212fce7" name="process_Results_To_CSV"/>
+				</otherwise>
+			</choice>
+		</until-successful>
+	</sub-flow>
+	<sub-flow name="process_Results_To_CSV" doc:id="99aa4100-c5c0-4a33-9c45-ad015953cd7b" >
+		<file:write doc:name="Write" doc:id="d1f310a9-e4de-4281-ba99-e70f39fd4170" config-ref="File_Config" path='#[vars.directoryName ++ "/JSONOutput/" ++ vars.fileName default "" ++ ".json"]' >
+			<file:content ><![CDATA[#[%dw 2.0
+output application/json
+---
+payload]]]></file:content>
+		</file:write>
+		<set-variable value="#[payload.results.headers[0]]" doc:name="headers" doc:id="5d31a36b-db2a-4bfd-8bad-0610a90fea13" variableName="headers"/>
+		<set-variable value="#[payload.results.orders[0].items[0]]" doc:name="lineItems" doc:id="27e87aa8-0d13-4ec1-849d-dbea70f799ed" variableName="lineItems"/>
+		<set-variable value="#[payload.analyzersResults]" doc:name="analyzersResults" doc:id="23d24814-4f32-490d-839f-045a0f0406de" variableName="analyzersResults"/>
+		<ee:transform doc:name="Transform Message" doc:id="e116d265-7f60-4105-bdf5-2ba283f6ecb9">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/csv quoteValues=true
+---
+if (sizeOf(vars.lineItems) > 0) vars.lineItems map ((item) -> {
+		CUSTOMER_ID : vars.headers.vendorName,
+		PO : vars.headers.poNumber default vars.headers.purchaseOrderReceiptId,
+		COMP_NAME : vars.headers.parties.BUYER_SHIP_TO.name,
+		ADDRESS : vars.headers.parties.BUYER_SHIP_TO.street,
+		CITY : vars.headers.parties.BUYER_SHIP_TO.city,
+		STATE : vars.headers.parties.BUYER_SHIP_TO.state replace  /[^a-z0-9A-Z]/ with "",
+		ZIP : vars.headers.parties.BUYER_SHIP_TO.zipCode,
+		COUNTRY : vars.headers.parties.BUYER_SHIP_TO.country,
+		CHARGEAMOUNT : vars.headers.total,
+		REQ_DELIVERY_DATE: (vars.analyzersResults filter (value, index) -> value.name == "req_delivery_date")[0].result,
+		REQ_SHIP_DATE: (vars.analyzersResults filter (value, index) -> value.name == "req_ship_date")[0].result,
+		PART_NUMBER: item.productCode,
+		UNIT_PRICE: item.unitPrice,
+		QUANTITY: item.quantity,
+		LINE_TEXT: item.description
+}) else {
+	CUSTOMER_ID : vars.headers.vendorName,
+		PO : vars.headers.poNumber default vars.headers.purchaseOrderReceiptId,
+		COMP_NAME : vars.headers.parties.BUYER_SHIP_TO.name,
+		ADDRESS : vars.headers.parties.BUYER_SHIP_TO.street,
+		CITY : vars.headers.parties.BUYER_SHIP_TO.city,
+		STATE : vars.headers.parties.BUYER_SHIP_TO.state replace  /[^a-z0-9A-Z]/ with "",
+		ZIP : vars.headers.parties.BUYER_SHIP_TO.zipCode,
+		COUNTRY : vars.headers.parties.BUYER_SHIP_TO.country,
+		CHARGEAMOUNT : vars.headers.total,
+		REQ_DELIVERY_DATE: (vars.analyzersResults filter (value, index) -> value.name == "req_delivery_date")[0].result,
+		REQ_SHIP_DATE: (vars.analyzersResults filter (value, index) -> value.name == "req_ship_date")[0].result,
+		PART_NUMBER: "",
+		UNIT_PRICE: "",
+		QUANTITY: "",
+		LINE_TEXT: ""
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+		<file:write doc:name="Write" doc:id="20193e30-8f48-4125-ac97-f306980bfa3b" config-ref="File_Config" path='#[vars.directoryName ++ "/Output/" ++ vars.fileName default "" ++ ".csv"]'>
+					</file:write>
+	</sub-flow>
+</mule>

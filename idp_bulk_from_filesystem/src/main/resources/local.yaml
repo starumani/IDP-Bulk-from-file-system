@@ -1,0 +1,21 @@
+http:
+    post_method: "POST"
+    get_method: "GET"
+    
+anypoint_http_request:
+    host: <YOUR ANYPOINT PLATFORM HOSTNAME>
+    base_path: "/accounts/api/v2"
+    auth_path: "/oauth2/token"
+    auth_grant_type: "client_credentials"
+    auth_client_id: <CLIENT ID OF YOUR CONNECTED APP - ON ANYPOINT PLATFORM>
+    auth_client_secret: <CLIENT SECRET OF YOUR CONNECTED APP - ON ANYPOINT PLATFORM>
+    
+idp_http_request:
+    host: <IDP SERVICE HOTSNAME>
+    base_path: "/api/v1/organizations/<ORGANIZATION ID>/"
+    executions_path: "actions/<ACTION ID>/playground/executions"
+    executions_by_id_path: "actions/<ACTION ID>/playground/executions/{executionId}"
+    
+   
+file_connector:
+    workingDirectory: <YOUR WORKING DIRECTORY>

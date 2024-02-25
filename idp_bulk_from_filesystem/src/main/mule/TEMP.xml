@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	
+	<!-- [STUDIO:"setup_results_directory"]<sub-flow name="setup_results_directory" doc:id="023f14b5-75ba-43df-ba44-be3372721a19" >
+		<set-variable value='#["Processing Results"&#93;' doc:name="rootDirectory" doc:id="3f4b6d57-e58f-4268-8717-4a4141ad02f2" variableName="rootDirectory"/>
+		<file:create-directory doc:name="Create Root Results directory" doc:id="8eb323fe-0dab-4b26-9dd2-2bfee288de6c" config-ref="File_Config" directoryPath="#[vars.rootDirectory&#93;"/>
+		<file:create-directory doc:name="Create directory for success" doc:id="9d510ff1-ffbc-463d-9e5f-2f1d95fda2ee" config-ref="File_Config" directoryPath='#[vars.rootDirectory ++ "/SUCCESS"&#93;'/>
+		<file:create-directory doc:name="Create directory for failures" doc:id="710c9323-ebe1-4e5b-b394-9602bb8e6fc0" config-ref="File_Config" directoryPath='#[vars.rootDirectory ++ "/FAILURE"&#93;'/>
+		<file:create-directory doc:name="Create directory for Manual Validation " doc:id="72d6dc24-ffc1-4d32-8525-c7b342c31c35" config-ref="File_Config" directoryPath='#[vars.rootDirectory ++ "/MANUAL VALIDATION REQUIRED"&#93;'/>
+		<remove-variable doc:name="Remove rootDirectory" doc:id="d79d3cae-0f11-4c6f-8880-9ca1115b4823" variableName="rootDirectory" />
+	</sub-flow> [STUDIO] -->
+	
+	<!-- [STUDIO:"TEMP-RenameFiles"]<flow name="TEMP-RenameFiles" doc:id="227b2b14-fa4c-4aa0-944d-f313db870761" >
+		<http:listener doc:name="Listener" doc:id="116a4794-e790-4b02-88ae-0be152f7079c" config-ref="TEMP_HTTP_Listener_config" path="/renameFilesConsecutive"/>
+		<file:list doc:name="List" doc:id="1020bc9a-1133-4fcd-a618-fff5dc531f1e" config-ref="File_Config" directoryPath="TEMP2" >
+			<file:matcher filenamePattern="*.{pdf,PDF}" directories="EXCLUDE" symLinks="EXCLUDE" />
+		</file:list>
+		<foreach doc:name="For Each" doc:id="91f04cfc-0240-48d2-ab9f-429960c3276d" collection="#[payload&#93;">
+			<file:rename doc:name="Rename" doc:id="c6f67f81-b981-4045-bd83-ba554325ae45" config-ref="File_Config" path="#[attributes.path&#93;" to='#[vars.counter as String ++ ".pdf"&#93;'/>
+		</foreach>
+		<ee:transform doc:name="Transform Message" doc:id="7dddf4d0-7016-408f-8c2a-10547f07bbd2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+&#45;&#45;-
+"SUCCESS"&#93;&#93;></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow> [STUDIO] -->
+	
+	<!-- [STUDIO:"TEMP-RestTriggerWithoutBatch"]<flow name="TEMP-RestTriggerWithoutBatch" doc:id="14a98f01-261e-40f4-8264-f9042ec9597e" >
+		<http:listener doc:name="Listener" doc:id="54863d10-54cd-48d4-b397-c799a636ebaa" config-ref="TEMP_HTTP_Listener_config" path="/triggerWithoutBatch"/>
+		<file:list doc:name="List" doc:id="2ab2a189-b417-40c5-85d3-76118828b508" config-ref="File_Config" directoryPath="TEMP" >
+			<file:matcher filenamePattern="*.{pdf,PDF}" directories="EXCLUDE" symLinks="EXCLUDE" />
+		</file:list>
+		<file:read doc:name="Read" doc:id="c64a3d38-ae0f-467b-bbd2-8f59e4f6e221" config-ref="File_Config" path="/Users/starumani/Desktop/IDP_Bulk_From_FileSystem_WorkingDirectory/TEMP/SamplePDF.pdf"/>
+		<ee:transform doc:name="Transform Message" doc:id="fb8c9588-ff2f-4165-8e29-c34bccdf95ee" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+import * from dw::core::Strings
+
+output application/octet-stream
+&#45;&#45;- 
+payload&#93;&#93;></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload&#93;" doc:name="currRecord" doc:id="83bb9738-30e4-4d87-aef6-fc67bb6af390" variableName="currRecord" />
+		<flow-ref doc:name="Authenticate Anypoint User" doc:id="cfc4894c-639f-49e8-870d-4dfe89adb645" name="authenticate_Anypoint_User" />
+		<flow-ref doc:name="Call IDP Service - Execution" doc:id="de84b900-7180-4f12-a2e5-fbc79a52e54f" name="call_IDP_Service" />
+		<flow-ref doc:name="Get Results from IDP Service - Polling" doc:id="2b3e6ffc-5680-4fee-8fb9-4ec292a00eb7" name="get_Results_From_IDP_Service" />
+	</flow> [STUDIO] -->
+	</mule>
